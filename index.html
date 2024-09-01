@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>A Pointless Animation</title>
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000;
+        }
+
+        #canvas-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="canvas-container">
+        <canvas id="can"></canvas>
+    </div>
+    <script>
+        const canvas = document.getElementById("can");
+        const ctx = canvas.getContext("2d");
+        const Random = {
+            Between: (min, max) =>
+                Math.floor(Math.random() * (max - min + 1) + min),
+            BetweenExcept: (min, max, except) => {
+                let random = Random.Between(min, max);
+                return random === except
+                    ? Random.BetweenExcept(min, max, except)
+                    : random;
+            },
+            Color: () =>
+                `rgb(${Random.BetweenExcept(0, 255, 0)}, ${Random.BetweenExcept(
+                    0,
+                    255,
+                    0
+                )}, ${Random.BetweenExcept(0, 255, 0)})`,
+        };
+        const BlockCount = 10;
+        let BallSpeed = 10;
+        const BallSpeedSame = false;
+        let blocks = [];
+        let Trail = {
+            white: [],
+            black: [],
+        };
+        let whiteBall = { x: 0, y: 0, radius: 10, dx: 0, dy: 0, color: "#fff" };
+        let blackBall = { x: 0, y: 0, radius: 10, dx: 0, dy: 0, color: "#000" };
+
+        if (BallSpeedSame) {
+            whiteBall.dx = BallSpeed;
+            whiteBall.dy = BallSpeed;
+            blackBall.dx = BallSpeed;
+            blackBall.dy = BallSpeed;
+        } else {
+            whiteBall.dx = Random.Between(1, BallSpeed);
+            whiteBall.dy = Random.Between(1, BallSpeed);
+            blackBall.dx = Random.Between(1, BallSpeed);
+            blackBall.dy = Random.Between(1, BallSpeed);
+        }
+
+        let isSpacePressed = false;
+        let isTPressed = false;
+
+        function handleKeyPress(event) {
+            if (event.code === "KeyT") {
+                isTPressed = !isTPressed;
+            }
+            if (event.code === "KeyC") {
+                let b = 0, w = 0;
+                blocks.forEach(el => {
+                    if (el.color == '#fff') w++;
+                    else b++
+                })
+                console.log("White:" + w);
+                console.log("Black:" + b)
+            }
+        }
+
+
+
+        function handleKeyDown(event) {
+            if (event.code === "Space" && !isSpacePressed) {
+                isSpacePressed = true;
+                adjustBallSpeed(0.25);
+            }
+        }
+
+        function handleKeyUp(event) {
+            if (event.code === "Space" && isSpacePressed) {
+                isSpacePressed = false;
+                adjustBallSpeed(4);
+            }
+        }
+
+        function adjustBallSpeed(factor) {
+            whiteBall.dx *= factor;
+            whiteBall.dy *= factor;
+            blackBall.dx *= factor;
+            blackBall.dy *= factor;
+        }
+
+        function initializeBlocks() {
+            let blockY = 0;
+            let blockX = 0;
+            const BlockSize = Math.floor(canvas.width / BlockCount); // Use Math.floor to ensure integer block size
+            const BlockHeight = Math.ceil(
+                canvas.height / (canvas.height / BlockSize)
+            ); // Ensure full coverage in height
+
+            for (let i = 0; blockY < canvas.height; i++) {
+                for (let j = 0; j < BlockCount; j++) {
+                    let clr = blockY < canvas.height / 2 ? "#fff" : "#000"; // half white half black pattern
+                    blocks.push({
+                        x: blockX,
+                        y: blockY,
+                        width: BlockSize,
+                        height: BlockHeight,
+                        color: clr,
+                    });
+                    blockX += BlockSize;
+                }
+                blockX = 0;
+                blockY += BlockHeight;
+            }
+        }
+
+        function setBallInitialPos() {
+            whiteBall.x = canvas.width / 2;
+            whiteBall.y = canvas.height / 1.5;
+            blackBall.x = canvas.width / 2;
+            blackBall.y = canvas.height / 3;
+        }
+
+        function drawBlocks() {
+            blocks.forEach((block) => {
+                ctx.beginPath();
+                ctx.rect(block.x, block.y, block.height, block.width);
+                ctx.fillStyle = block.color;
+                ctx.fill();
+                ctx.closePath();
+            });
+        }
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            blocks = [];
+            initializeBlocks();
+            setBallInitialPos();
+        }
+
+        function drawBall(ball) {
+            ctx.shadowColor = ball.color;
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fillStyle = ball.color;
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        function drawTrail() {
+            if (!isTPressed) {
+                Trail = {
+                    white: [],
+                    black: [],
+                };
+                return;
+            }
+            for (let type in Trail) {
+                for (let i = 0; i < Trail[type].length; i++) {
+                    let rad = 7 - (1 - i / Trail[type].length) * 7;
+                    let TrailBall = {
+                        x: Trail[type][i].x,
+                        y: Trail[type][i].y,
+                        radius: rad,
+                        color: type === "white" ? "#fff" : "#000",
+                    };
+                    drawBall(TrailBall);
+                }
+            }
+        }
+
+        function updateBall(ball) {
+            let type = ball.color === "#fff" ? "white" : "black";
+            if (isTPressed) {
+                Trail[type].push({ x: ball.x, y: ball.y });
+                if (Trail[type].length > 40) {
+                    Trail[type].shift();
+                }
+            }
+
+            ball.x += ball.dx;
+            ball.y += ball.dy;
+
+            // Bounce off side walls
+            if (ball.x + ball.radius > canvas.width || ball.x - ball.radius < 0) {
+                ball.dx = -ball.dx;
+            }
+
+            // Bounce off top and bottom walls
+            if (ball.y + ball.radius > canvas.height || ball.y - ball.radius < 0) {
+                ball.dy = -ball.dy;
+            }
+
+            // Bounce off blocks if same color
+            for (let i = 0; i < blocks.length; i++) {
+                let block = blocks[i];
+                if (
+                    ball.y - ball.radius < block.y + block.height &&
+                    ball.y + ball.radius > block.y &&
+                    ball.x + ball.radius > block.x &&
+                    ball.x - ball.radius < block.x + block.width
+                ) {
+                    if (ball.color === block.color) {
+                        // Determine the overlap on both axes
+                        let overlapX = Math.min(
+                            ball.x + ball.radius - block.x,
+                            block.x + block.width - (ball.x - ball.radius)
+                        );
+                        let overlapY = Math.min(
+                            ball.y + ball.radius - block.y,
+                            block.y + block.height - (ball.y - ball.radius)
+                        );
+
+                        // Resolve collision by choosing the smaller overlap
+                        if (overlapX < overlapY) {
+                            ball.dx = -ball.dx;
+                        } else {
+                            ball.dy = -ball.dy;
+                        }
+
+                        // Change block color
+                        block.color = type === "white" ? "#000" : "#fff";
+                        break;
+                    }
+                }
+            }
+        }
+
+        function animate() {
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            drawBlocks();
+
+            drawBall(whiteBall);
+            drawBall(blackBall);
+
+            updateBall(whiteBall);
+            updateBall(blackBall);
+
+            drawTrail();
+
+            requestAnimationFrame(animate);
+        }
+        window.addEventListener("resize", resizeCanvas);
+        window.addEventListener("keydown", handleKeyDown);
+        window.addEventListener("keyup", handleKeyUp);
+        window.addEventListener("keypress", handleKeyPress);
+        resizeCanvas();
+        animate();
+    </script>
+</body>
+
+</html>
